@@ -33,20 +33,18 @@ IMG_HEIGHT = 640
 
 class CollageMaker:
 
-    def __init__(self, width, height, scale=2, collage_type=1, req_list=[], unique=True, palette=()):
+    def __init__(self, width, height, scale=2, collage_type=1, palette=()):
         self.collage_height = height
         self.collage_width = width
-        self.req_list = req_list
-        self.albums = []
+        self.covers = []
         self.scale = scale
         self.type = collage_type
-        self.unique = unique
         self.palette = palette
         pass
 
     # Logs into Spotify and takes the top tracks from the user and places them in the album array
     # TODO: Look up individual artists and tracks (No Sign-In Required)
-    def get_albums_userdata(self):
+    def get_art_from_userdata(self):
         # Sign into application
         token = spotipy.util.prompt_for_user_token(
             username='username',
@@ -58,28 +56,29 @@ class CollageMaker:
         )
         auth = spotipy.Spotify(auth=token)
         results = auth.current_user_top_tracks(
-            time_range='medium_term',
+            time_range='short_term',
             limit='50')
+        
         for item in results['items']:
             img_url = item['album']['images'][0]['url']
-            self.albums.append(img_url)
+            if item['album']['name'] not in set(self.covers):
+                self.covers.append(img_url)
 
-    def get_albums_artists(self):
+    def get_art_from_artist_list(self):
         # Look up array of artists (By ID??)
 
-        # Populate with 3 (make variable??) of artists, most popular tracks
-
+        # Populate with 3 (make variable??) of artists, most popular albums
         # return populated list
         return
 
-    def get_albums_tracks(self):
+    def get_art_from_tracks(self):
         # Look up array of tracks (By ID)
 
         # Get album art
 
         return
 
-    def get_playlist_albums(self):
+    def get_art_from_playlist(self):
         # Get albums from a playlist
 
         # Get album art
@@ -89,15 +88,15 @@ class CollageMaker:
     # Determine which method of get album to use then download albums
     def get_albums(self):
         if self.type == 1:
-            self.get_albums_userdata()
+            self.get_art_from_userdata()
         elif self.type == 2:
-            self.get_albums_artists()
+            self.get_art_from_artist_list()
         elif self.type == 3:
-            self.get_albums_tracks()
+            self.get_art_from_tracks()
         else:
-            self.get_playlist_albums()
+            self.get_art_from_playlist()
 
-        # TODO: Download album art to a folder
+        # TODO: Download album art to a folder??
         return
 
     # Scale album data to a best fit size
@@ -114,34 +113,35 @@ class CollageMaker:
     # TODO: Add color and palette functionality
     def get_random_album(self, prev):
         # TODO: Implement a semi random weight system
-        img = random.choice(self.albums)
+        img = random.choice(self.covers)
         while img == prev:
-            img = random.choice(self.albums)
+            img = random.choice(self.covers)
         return img
 
     def create(self):
         collage = Image.new('RGB', (self.collage_width, self.collage_height))
-        collage_fp = 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) + str(datetime.now().strftime(
+        collage_fp = 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) +"_"+ str(datetime.now().strftime(
             '%d-%m-%Y-%H-%M-%S')) + '.png'
         self.get_albums()
         size = self.scale_dimensions()
         rows = int(self.collage_width / size)
         cols = int(self.collage_height / size)
         print(size, rows, cols)
-        prev_path = random.choice(self.albums)
-        print("Total Rows: " + str(rows) + "Total Columns: " + str(cols))
+        prev_path = random.choice(self.covers)
+        print("Total Photos: " + str(rows*cols))
 
+        count = 0
         for i in range(rows):
             for j in range(cols):
-                print("Photo Added -> X: " + str(i) + "Y: " + str(j))
+                count += 1
+                print("Adding Photo " + str(count) + " of " + str(rows*cols))
                 img_path = self.get_random_album(prev_path)
-                if self.unique:
-                    self.albums.remove(prev_path)
                 img = Image.open(requests.get(img_path, stream=True).raw)
                 img.thumbnail((size, size))
                 collage.paste(img, (i * size, j * size))
                 prev_path = img_path
                 collage.save(collage_fp)
+        print("Done!")
         return Image.open(collage_fp)
 
 
