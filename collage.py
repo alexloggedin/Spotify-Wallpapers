@@ -120,9 +120,12 @@ class CollageMaker:
 
     def create(self):
         collage = Image.new('RGB', (self.collage_width, self.collage_height))
+        #Create Collage at location
         collage_fp = 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) +"_"+ str(datetime.now().strftime(
             '%d-%m-%Y-%H-%M-%S')) + '.png'
         self.get_albums()
+
+        # Get Size and dimensions of grid 
         size = self.scale_dimensions()
         rows = int(self.collage_width / size)
         cols = int(self.collage_height / size)
