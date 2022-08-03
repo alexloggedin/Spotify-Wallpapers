@@ -10,12 +10,14 @@ IMG_HEIGHT = 640
 
 class CollageMaker:
 
-    def __init__(self, covers, width = 1080, height = 1080, scale = 2, type = 'grid'):
+    def __init__(self, covers, width = 1080, height = 1080, scale = 2, type = 'grid', tilt = False):
         self.collage_height = height
         self.collage_width = width
         self.cover_list = covers
         self.type = type
         self.scale = 1 if type == 'collage' else scale
+        self.tilt = tilt
+        self.img_size = self.scaleDimensions()
     
     def scaleDimensions(self):
         # Use GCF to determine scale factor
@@ -56,10 +58,25 @@ class CollageMaker:
          
         return grid
 
-
-    
-    def createCollage(self):        
-        picture_fp = 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) +"_"+ str(datetime.now().strftime(
+    def nameCollage(self):
+        return 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) +"_"+ str(datetime.now().strftime(
             '%d-%m-%Y-%H-%M-%S')) + '.png'
-        
+    
+    def setImageCoord(self,s, a):
+        if self.type == 'grid':
+            return a * self.img_size
+
+    def createCollage(self):        
         picture = Image.new('RGB', (self.collage_width, self.collage_height))
+        grid = self.organzieCovers()
+
+        for row,i in enumerate(grid):
+            for col,j in enumerate(grid):
+                img_url = grid[i][j] 
+                img = Image.open(requests.get(img_url, stream=True).raw)
+                img.thumbnail((self.img_size, self.img_size))
+
+                x_coord = self.setImageCoord('x',i)
+                y_coord = self.setImageCoord('y', j)
+                
+                picture.paste(img, (x_coord,y_coord))
