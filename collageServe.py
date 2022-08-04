@@ -20,7 +20,7 @@ class CollageMaker:
     width = 1080,           
     height = 1080, 
     scale = 2,                      # 1, 2, 3
-    type = 'grid',                  # grid, collage 
+    type = 'collage',               # grid, collage 
     tilt = 'rand',                  # none, uniform, grid, rand
     bgColor = (0,0,0),              # Black default, no transparency
     transparentBg= True,           # Transparent Bg for tilt
@@ -141,7 +141,7 @@ class CollageMaker:
             cover = covers.pop()
             row, col, img_url = cover
             diff = total - len(covers)
-            print(f"Printing Grid -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
+            # print(f"Printing Grid -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
 
             # Load Image
             img = Image.open(requests.get(img_url, stream=True).raw)
@@ -167,7 +167,7 @@ class CollageMaker:
             cover = covers.pop()
             row, col, img_url = cover
             diff = total - len(covers)
-            print(f"Printing Collage -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
+            # print(f"Printing Collage -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
 
             # Load Image
             img = Image.open(requests.get(img_url, stream=True).raw)
