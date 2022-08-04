@@ -4,11 +4,9 @@ from PIL import Image, ImageFilter
 import random
 import requests
 from datetime import datetime
+from Handlers.SpotifyHandler import AlbumCoverGetter
 
 # Temp Dev imports
-from creds import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
-import spotipy
-import spotipy.util
 
 IMG_HEIGHT = 640
 
@@ -35,8 +33,8 @@ class CollageMaker:
         self.bg_color = bgColor
         self.random_type = randomType
         self.transparent_bg = transparentBg
-        self.img_size = self.scaleDimensions() / self.scale
-        print(self.img_size)   
+        self.img_size = self.scaleDimensions() / self.scale 
+        print(f"Image Size: {self.img_size}") 
 
     def scaleDimensions(self):
         # Use GCF to determine scale factor
@@ -56,11 +54,7 @@ class CollageMaker:
         img_size = round(self.scaleDimensions() / self.scale)
         n_rows = int(self.collage_width / img_size)
         n_cols = int(self.collage_height / img_size)
-
-        if self.type == 'collage':
-            f = 1
-            n_rows = round(n_rows * f)
-            n_cols = round(n_cols * f)
+        print(f"Total Items: {n_rows * n_cols}")
 
         # Generate Grid
         unused = set(self.cover_list)
@@ -89,7 +83,6 @@ class CollageMaker:
     
     def setRandomImageCoords(self, row, col):
         offset = round(self.scaleDimensions() / 8)
-        print(f"Offset: {offset}")
 
         # Set boundary
         MAX_X = self.collage_width - round(.5*self.img_size)
@@ -208,21 +201,12 @@ class CollageMaker:
             collage = self.layoutCollage(collage, covers)
         
         # Save Collage and Return it?
-        print(f"Size: {self.img_size}")
-        print(self.nameCollage())
+        print(f"Save Location: {self.nameCollage()}")
         collage.save(self.nameCollage())
         return collage
 
+g = AlbumCoverGetter()
+covers = g.getTopTracks()
 
-covers = [
-    "samples/21_savage.jpg",
-    "samples/drake-dark-lane-demo-tapes.jpg",
-    "samples/Drake-Scorpion.jpg",
-    "samples/gucci.jpg",
-    "samples/Kendrick-Lamar-DAMN.-album-cover-art.jpg",
-    "samples/lil-uzi-vert-love-vs-the-world-2-1584053330-640x640.jpeg",
-    "samples/Middle-Child.jpg"
-    ]
-
-c = CollageMaker(covers, scale = 1, width=840, height=1800, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
+c = CollageMaker(covers, scale = 1, width=1000, height=1800, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
 c.createCollage()
