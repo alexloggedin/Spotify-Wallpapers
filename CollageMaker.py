@@ -111,7 +111,7 @@ class CollageMaker:
         return pseudo if self.random_type == 'semi' else fullrandom
 
     def setTilt(self, img):
-        angle = 90
+        angle = 35
 
         if self.tilt == 'uniform': 
             angle = 45
