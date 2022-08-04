@@ -22,9 +22,8 @@ def login():
                                 client_id = SPOTIFY_CLIENT_ID,
                                 client_secret = SPOTIFY_CLIENT_SECRET,
                                 redirect_uri='http://localhost:5000'
-                            )
-                                
-        sp = spotipy.Spotify(auth_manager=auth_manager)
+                            )       
+    sp = spotipy.Spotify(auth_manager=auth_manager)
 
 @app.route('/render', method = 'GET')
 def render():
