@@ -1,8 +1,9 @@
 creds.py
 __pycache__
 .vscode
-.cache_username
+.cache-username
 .idea
 env
 venv
 /venv
+dev_collages

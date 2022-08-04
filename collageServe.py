@@ -1,24 +1,43 @@
+import math
 import os
-from creds import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
-from PIL import Image
+from PIL import Image, ImageFilter
 import random
 import requests
 from datetime import datetime
+
+# Temp Dev imports
+from creds import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+import spotipy
+import spotipy.util
 
 IMG_HEIGHT = 640
 
 
 class CollageMaker:
 
-    def __init__(self, covers, width = 1080, height = 1080, scale = 2, type = 'grid', tilt = False):
-        self.collage_height = height
-        self.collage_width = width
+    def __init__(self, 
+    covers,                         # List of URLs pointing to images
+    width = 1080,           
+    height = 1080, 
+    scale = 2,                      # 1, 2, 3
+    type = 'grid',                  # grid, collage 
+    tilt = 'rand',                  # none, uniform, grid, rand
+    bgColor = (0,0,0),              # Black default, no transparency
+    transparentBg= True,           # Transparent Bg for tilt
+    randomType = 'full'             # semi, full
+    ):
+        self.collage_height = round(height)
+        self.collage_width = round(width)
         self.cover_list = covers
         self.type = type
-        self.scale = 1 if type == 'collage' else scale
+        self.scale = scale
         self.tilt = tilt
-        self.img_size = self.scaleDimensions()
-    
+        self.bg_color = bgColor
+        self.random_type = randomType
+        self.transparent_bg = transparentBg
+        self.img_size = self.scaleDimensions() / self.scale
+        print(self.img_size)   
+
     def scaleDimensions(self):
         # Use GCF to determine scale factor
         h, w = self.collage_height, self.collage_width
@@ -26,7 +45,7 @@ class CollageMaker:
             h, w = w, h
         for x in range(IMG_HEIGHT, 0, -1):
             if h % x == 0 and w % x == 0:
-                return int(x / self.scale)
+                return int(x)
 
     """
     Takes the covers and populates a matrix where [row][col] = image link 
@@ -34,49 +53,176 @@ class CollageMaker:
     """
     def organzieCovers(self):
         # Calculate number of rows and columns based on image size
-        img_size = self.scaleDimensions()
+        img_size = round(self.scaleDimensions() / self.scale)
         n_rows = int(self.collage_width / img_size)
-        n_ols = int(self.collage_height / img_size)
+        n_cols = int(self.collage_height / img_size)
+
+        if self.type == 'collage':
+            f = 1
+            n_rows = round(n_rows * f)
+            n_cols = round(n_cols * f)
 
         # Generate Grid
         unused = set(self.cover_list)
         used = set()
-        grid = []
-        #Iterate through grid and place covers, reseting when covers run out 
+        images = set()
+
         for row in range(n_rows):
-            grid.append([])
-            for col in range(n_rows):
+            for col in range(n_cols):
                 # Check if unused is empty and reset the sets if so
                 if len(unused) == 0:
-                    unused = used
+                    unused = set(self.cover_list)
                     used.clear()
 
-                # Take a cover and add it to the grid
+                # Take a cover and add it to the tuple set
                 cover = unused.pop()
-                grid[row].append(cover)
+                images.add((row, col, cover))
                 used.add(cover)
-         
-        return grid
+        
+        return images
 
     def nameCollage(self):
-        return 'collages/collage' + str(self.collage_width) + 'x' + str(self.collage_height) +"_"+ str(datetime.now().strftime(
-            '%d-%m-%Y-%H-%M-%S')) + '.png'
+        dimensions = str(self.collage_width) + 'x' + str(self.collage_height)
+        date = str(datetime.now().strftime('%d-%m-%Y-%H-%M-%S'))
+        folder = 'dev_collages'
+        return f'{folder}/{self.type}_scale{self.scale}_{date}.png'
     
-    def setImageCoord(self,s, a):
-        if self.type == 'grid':
-            return a * self.img_size
+    def setRandomImageCoords(self, row, col):
+        offset = round(self.scaleDimensions() / 8)
+        print(f"Offset: {offset}")
 
-    def createCollage(self):        
-        picture = Image.new('RGB', (self.collage_width, self.collage_height))
-        grid = self.organzieCovers()
+        # Set boundary
+        MAX_X = self.collage_width - round(.5*self.img_size)
+        MAX_Y = self.collage_height - round(.5*self.img_size)
 
-        for row,i in enumerate(grid):
-            for col,j in enumerate(grid):
-                img_url = grid[i][j] 
-                img = Image.open(requests.get(img_url, stream=True).raw)
-                img.thumbnail((self.img_size, self.img_size))
+        # full random
+        fullrandom = (random.randint(0 - offset, MAX_X), random.randint(0 - offset, MAX_Y))
 
-                x_coord = self.setImageCoord('x',i)
-                y_coord = self.setImageCoord('y', j)
-                
-                picture.paste(img, (x_coord,y_coord))
+        # pseudo random
+        min = round(-offset)
+        max = round(offset)
+
+        x = (row * self.img_size) + random.randint(min, max)
+        y = (col * self.img_size) + random.randint(min, max)
+        
+        # MAX CHECK MAX_X - offset
+        x = x if x < MAX_X else random.randint(0 - offset, MAX_X)
+        y = y if y < MAX_Y else random.randint(0 - offset, MAX_Y)
+
+        # #MIN CHECK
+        x = x if x > 0 - offset else random.randint(0, offset)
+        y = y if y > 0 - offset else random.randint(0, offset)
+
+        pseudo = (round(x),round(y))
+
+        return pseudo if self.random_type == 'semi' else fullrandom
+
+    def setTilt(self, img):
+        angle = 90
+
+        if self.tilt == 'uniform': 
+            angle = 45
+            img = img.rotate(angle, fillcolor = self.bg_color, expand=True)
+        
+        elif self.tilt == 'grid': 
+            angle = random.randrange(-270, 270, 90)
+            img = img.rotate(angle, fillcolor = self.bg_color, expand=True)
+        
+        elif self.tilt == 'rand':
+            angle = random.randint(-angle,angle)
+            img = img.rotate(angle, fillcolor = "black", expand=True)
+
+        return img,angle
+
+    def layoutBaseGrid(self, collage, covers):
+        total = len(covers)
+
+        while covers:
+            cover = covers.pop()
+            row, col, img_url = cover
+            diff = total - len(covers)
+            print(f"Printing Grid -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
+
+            # Load Image
+            img = Image.open(requests.get(img_url, stream=True).raw)
+            #img = Image.open(img_url)
+            
+            #Resize image based on scale
+            img.thumbnail((self.img_size, self.img_size))
+
+            #Get coordinates
+            location = (round((row * self.img_size)),round((col * self.img_size)))
+
+            # Add Image to document    
+            collage.paste(img, (location))
+            img.close()
+        
+        return collage
+
+    def layoutCollage(self, collage, covers):
+        total = len(covers)
+        
+        while covers:
+            # Unload Tuple
+            cover = covers.pop()
+            row, col, img_url = cover
+            diff = total - len(covers)
+            print(f"Printing Collage -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
+
+            # Load Image
+            img = Image.open(requests.get(img_url, stream=True).raw)
+            #img = Image.open(img_url)
+            
+            #Resize image based on scale
+            img.thumbnail((self.img_size, self.img_size))
+
+            # Tilt Image if enabled
+            t = self.setTilt(img)
+            img = t[0]
+
+            #Get coordinates
+            location = self.setRandomImageCoords(row, col)
+
+            if self.transparent_bg:
+                 mask = Image.new("RGBA", (round(self.img_size), round(self.img_size)), color='white')
+                 mask = mask.rotate(t[1], expand = True)
+                 collage.paste(img, (location), mask)
+                 img.close()
+                 mask.close()
+                 continue
+
+            # Add Image to document    
+            collage.paste(img, (location))
+            img.close()
+        
+        # Save Collage and Return it?
+        return collage
+
+    def createCollage(self):
+        collage = Image.new('RGBA', (self.collage_width, self.collage_height), color=self.bg_color)
+        covers = self.organzieCovers()
+        collage =  self.layoutBaseGrid(collage, covers)
+        
+        if self.type == 'collage':
+            covers = self.organzieCovers()
+            collage = self.layoutCollage(collage, covers)
+        
+        # Save Collage and Return it?
+        print(f"Size: {self.img_size}")
+        print(self.nameCollage())
+        collage.save(self.nameCollage())
+        return collage
+
+
+covers = [
+    "samples/21_savage.jpg",
+    "samples/drake-dark-lane-demo-tapes.jpg",
+    "samples/Drake-Scorpion.jpg",
+    "samples/gucci.jpg",
+    "samples/Kendrick-Lamar-DAMN.-album-cover-art.jpg",
+    "samples/lil-uzi-vert-love-vs-the-world-2-1584053330-640x640.jpeg",
+    "samples/Middle-Child.jpg"
+    ]
+
+c = CollageMaker(covers, scale = 1, width=840, height=1800, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
+c.createCollage()
