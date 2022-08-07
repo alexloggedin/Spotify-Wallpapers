@@ -17,7 +17,7 @@ class CollageMaker:
     covers,                         # List of URLs pointing to images
     width = 1080,           
     height = 1080, 
-    scale = 2,                      # 1, 2, 3
+    scale = 1,                      # 1, 2, 3
     type = 'collage',               # grid, collage 
     tilt = 'rand',                  # none, uniform, grid, rand
     bgColor = (0,0,0),              # Black default, no transparency
@@ -208,5 +208,9 @@ class CollageMaker:
 g = AlbumCoverGetter()
 covers = g.getTopTracks()
 
-c = CollageMaker(covers, scale = 1, width=1000, height=1800, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
+w = int(input("Enter Width: "))
+h = int(input("Enter Height: "))
+s = int(input('Enter Scale (1 is default): '))
+
+c = CollageMaker(covers, scale = s, width=w, height=h, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
 c.createCollage()
