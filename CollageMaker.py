@@ -6,9 +6,9 @@ import requests
 from datetime import datetime
 from Handlers.SpotifyHandler import AlbumCoverGetter
 
-# Temp Dev imports
-
 IMG_HEIGHT = 640
+MIN_VAR = 0.5
+MAX_VAR = 1.5
 
 
 class CollageMaker:
@@ -20,9 +20,9 @@ class CollageMaker:
     scale = 1,                      # 1, 2, 3
     type = 'collage',               # grid, collage 
     tilt = 'rand',                  # none, uniform, grid, rand
-    bgType = 'grid',                 # grid, solid
+    bgType = 'solid',                 # grid, solid
     bgColor = (0,0,0),              # Black default, no transparency
-    transparentBg= True,           # Transparent Bg for tilt
+    transparentTiltBg= True,           # Transparent Bg for tilt
     randomType = 'full',             # semi, full
     varySize = False
     ):
@@ -32,9 +32,10 @@ class CollageMaker:
         self.type = type
         self.scale = scale
         self.tilt = tilt
+        self.bg_type = bgType
         self.bg_color = bgColor
         self.random_type = randomType
-        self.transparent_bg = transparentBg
+        self.transparent_bg = transparentTiltBg
         self.vary_size = varySize
         self.img_size = self.scaleDimensions() / self.scale 
         print(f"Image Size: {self.img_size}") 
@@ -132,6 +133,10 @@ class CollageMaker:
         elif self.tilt == 'rand':
             angle = random.randint(-angle,angle)
             img = img.rotate(angle, fillcolor = "black", expand=True)
+        
+        elif self.tilt == 'none':
+            angle = 0
+            img = img.rotate(angle, fillcolor = "black", expand=True)           
 
         return img,angle
 
@@ -214,7 +219,8 @@ class CollageMaker:
         collage = Image.new('RGBA', (self.collage_width, self.collage_height), color=self.bg_color)
         coords = self.organzieCoords()
         covers = set(self.cover_list)
-        collage =  self.layoutBaseGrid(collage, coords, covers)
+        if not self.bg_type == 'solid':
+            collage =  self.layoutBaseGrid(collage, coords, covers)
         
         if self.type == 'collage':
             coords = self.organzieCoords()
@@ -233,5 +239,15 @@ covers = g.getTopTracks()
 # h = int(input("Enter Height: "))
 # s = int(input('Enter Scale (1 is default): '))
 
-c = CollageMaker(covers, scale = 3, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True, varySize=True, randomType='semi')
+c = CollageMaker(covers, 
+    scale = 3, 
+    type = 'collage', 
+    bgColor = (255,255,255), # 4 value makes bg Transparent
+    tilt='none', 
+    transparentTiltBg=False, # Meant for tilts
+    varySize=True, 
+    randomType='semi',
+    bgType= 'solid'
+    )
 c.createCollage()
+
