@@ -20,9 +20,11 @@ class CollageMaker:
     scale = 1,                      # 1, 2, 3
     type = 'collage',               # grid, collage 
     tilt = 'rand',                  # none, uniform, grid, rand
+    bgType = 'grid',                 # grid, solid
     bgColor = (0,0,0),              # Black default, no transparency
     transparentBg= True,           # Transparent Bg for tilt
-    randomType = 'full'             # semi, full
+    randomType = 'full',             # semi, full
+    varySize = False
     ):
         self.collage_height = round(height)
         self.collage_width = round(width)
@@ -33,6 +35,7 @@ class CollageMaker:
         self.bg_color = bgColor
         self.random_type = randomType
         self.transparent_bg = transparentBg
+        self.vary_size = varySize
         self.img_size = self.scaleDimensions() / self.scale 
         print(f"Image Size: {self.img_size}") 
 
@@ -49,7 +52,7 @@ class CollageMaker:
     Takes the covers and populates a matrix where [row][col] = image link 
     Write a new cover assignment function if I want frequency data
     """
-    def organzieCovers(self):
+    def organzieCoords(self):
         # Calculate number of rows and columns based on image size
         img_size = round(self.scaleDimensions() / self.scale)
         n_rows = int(self.collage_width / img_size)
@@ -57,23 +60,13 @@ class CollageMaker:
         print(f"Total Items: {n_rows * n_cols}")
 
         # Generate Grid
-        unused = set(self.cover_list)
-        used = set()
-        images = set()
+        c = set()
 
         for row in range(n_rows):
             for col in range(n_cols):
-                # Check if unused is empty and reset the sets if so
-                if len(unused) == 0:
-                    unused = set(self.cover_list)
-                    used.clear()
-
-                # Take a cover and add it to the tuple set
-                cover = unused.pop()
-                images.add((row, col, cover))
-                used.add(cover)
+                c.add((row, col))
         
-        return images
+        return c
 
     def nameCollage(self):
         dimensions = str(self.collage_width) + 'x' + str(self.collage_height)
@@ -81,12 +74,25 @@ class CollageMaker:
         folder = 'dev_collages'
         return f'{folder}/{self.type}_scale{self.scale}_{date}.png'
     
-    def setRandomImageCoords(self, row, col):
+    def expand2square(self, pil_img):
+        width, height = pil_img.size
+        if width == height:
+            return pil_img
+        elif width > height:
+            result = Image.new(pil_img.mode, (width, width), self.bg_color)
+            result.paste(pil_img, (0, (width - height) // 2))
+            return result
+        else:
+            result = Image.new(pil_img.mode, (height, height), self.bg_color)
+            result.paste(pil_img, ((height - width) // 2, 0))
+            return result
+    
+    def setRandomImageCoords(self, row, col, sz):
         offset = round(self.scaleDimensions() / 8)
 
         # Set boundary
-        MAX_X = self.collage_width - round(.5*self.img_size)
-        MAX_Y = self.collage_height - round(.5*self.img_size)
+        MAX_X = self.collage_width - round(.5*sz)
+        MAX_Y = self.collage_height - round(.5*sz)
 
         # full random
         fullrandom = (random.randint(0 - offset, MAX_X), random.randint(0 - offset, MAX_Y))
@@ -95,8 +101,8 @@ class CollageMaker:
         min = round(-offset)
         max = round(offset)
 
-        x = (row * self.img_size) + random.randint(min, max)
-        y = (col * self.img_size) + random.randint(min, max)
+        x = (row * sz) + random.randint(min, max)
+        y = (col * sz) + random.randint(min, max)
         
         # MAX CHECK MAX_X - offset
         x = x if x < MAX_X else random.randint(0 - offset, MAX_X)
@@ -112,6 +118,8 @@ class CollageMaker:
 
     def setTilt(self, img):
         angle = 35
+        if img.size[0] != img.size[1]:
+            img = self.expand2square(img)
 
         if self.tilt == 'uniform': 
             angle = 45
@@ -127,13 +135,16 @@ class CollageMaker:
 
         return img,angle
 
-    def layoutBaseGrid(self, collage, covers):
-        total = len(covers)
+    def layoutBaseGrid(self, collage, coords, covers):
+        total = len(coords)
 
-        while covers:
-            cover = covers.pop()
-            row, col, img_url = cover
-            diff = total - len(covers)
+        while coords:
+            if len(covers) == 0:
+                covers = set(self.cover_list)
+
+            img_url  = covers.pop()
+            row, col, = coords.pop()
+            diff = total - len(coords)
             # print(f"Printing Grid -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
 
             # Load Image
@@ -152,13 +163,16 @@ class CollageMaker:
         
         return collage
 
-    def layoutCollage(self, collage, covers):
-        total = len(covers)
-        
-        while covers:
-            # Unload Tuple
-            cover = covers.pop()
-            row, col, img_url = cover
+    def layoutCollage(self, collage, coords, covers):
+        total = len(coords)
+
+        while coords:
+            if len(covers) == 0:
+                print("Resetting Cover list")
+                covers = set(self.cover_list)
+
+            img_url  = covers.pop()
+            row, col, = coords.pop()
             diff = total - len(covers)
             # print(f"Printing Collage -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
 
@@ -167,22 +181,27 @@ class CollageMaker:
             #img = Image.open(img_url)
             
             #Resize image based on scale
-            img.thumbnail((self.img_size, self.img_size))
+            f = 1 if not self.vary_size else random.uniform(0.5,1.5)
+            sz = round(self.img_size * f)
+            img.thumbnail((sz, sz))
 
             # Tilt Image if enabled
             t = self.setTilt(img)
             img = t[0]
 
             #Get coordinates
-            location = self.setRandomImageCoords(row, col)
+            location = self.setRandomImageCoords(row, col, sz)
 
             if self.transparent_bg:
-                 mask = Image.new("RGBA", (round(self.img_size), round(self.img_size)), color='white')
-                 mask = mask.rotate(t[1], expand = True)
-                 collage.paste(img, (location), mask)
-                 img.close()
-                 mask.close()
-                 continue
+                mask = Image.new("RGBA", (sz,sz), color='white')
+                mask = mask.rotate(t[1], expand = True)
+
+                mask.save('mask.png')
+                img.save('img.png')
+                collage.paste(img, (location), mask)
+                img.close()
+                mask.close()
+                continue
 
             # Add Image to document    
             collage.paste(img, (location))
@@ -193,12 +212,13 @@ class CollageMaker:
 
     def createCollage(self):
         collage = Image.new('RGBA', (self.collage_width, self.collage_height), color=self.bg_color)
-        covers = self.organzieCovers()
-        collage =  self.layoutBaseGrid(collage, covers)
+        coords = self.organzieCoords()
+        covers = set(self.cover_list)
+        collage =  self.layoutBaseGrid(collage, coords, covers)
         
         if self.type == 'collage':
-            covers = self.organzieCovers()
-            collage = self.layoutCollage(collage, covers)
+            coords = self.organzieCoords()
+            collage = self.layoutCollage(collage, coords, covers)
         
         # Save Collage and Return it?
         print(f"Save Location: {self.nameCollage()}")
@@ -206,11 +226,12 @@ class CollageMaker:
         return collage
 
 g = AlbumCoverGetter()
+covers = g.getPlaylistTracks('3tFCJHUdyOH6wItKvVBBlJ')
 covers = g.getTopTracks()
 
-w = int(input("Enter Width: "))
-h = int(input("Enter Height: "))
-s = int(input('Enter Scale (1 is default): '))
+# w = int(input("Enter Width: "))
+# h = int(input("Enter Height: "))
+# s = int(input('Enter Scale (1 is default): '))
 
-c = CollageMaker(covers, scale = s, width=w, height=h, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True)
+c = CollageMaker(covers, scale = 3, type = 'collage', bgColor = (255,255,255,0), tilt='rand', transparentBg=True, varySize=True, randomType='semi')
 c.createCollage()

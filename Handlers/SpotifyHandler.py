@@ -30,15 +30,25 @@ class AlbumCoverGetter:
 
     def getPlaylistTracks(self, playlistId):
         data = self.sp.playlist_items(playlistId)
-        print(data)
-    
-# 'user-top-read playlist-read-private user-read-private user-read-email'
+        c = []
+        for item in data['items']:
+            img_url = item['track']['album']['images'][0]['url']
+            c.append(img_url)
+        return c
 
-        # token = spotipy.util.prompt_for_user_token(
-        #     username='user',
-        #     scope='user-top-read playlist-read-private user-read-private user-read-email',
-        #     client_id=SPOTIFY_CLIENT_ID,
-        #     client_secret=SPOTIFY_CLIENT_SECRET,
-        #     redirect_uri='http://localhost:5000/spcallback'
-        #     )
-        # self.sp = spotipy.Spotify(auth=token)
+    def getArtistCovers(self, artistId):
+        pass
+
+    def getArtistIds(self, list):
+        # Search for each artist
+        # return Id of artist
+
+        pass
+
+    def getMultipleArtistCovers(self, list):
+        c = []
+        for id in list:
+            ac = self.getArtistCovers(id) 
+            c.append(ac)
+        return c
+
