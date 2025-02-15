@@ -1,11 +1,13 @@
 import math
-import os
+import sys
+import argparse
 from PIL import Image, ImageFilter
 import random
 import requests
 from datetime import datetime
 from Handlers.SpotifyHandler import AlbumCoverGetter
-from points import poisson_disk_sampling
+from points import Sampler
+import numpy as np
 
 IMG_HEIGHT = 640
 MIN_VAR = 0.5
@@ -20,7 +22,7 @@ class CollageMakerV2:
     height = 1080, 
     scale = 1,                      # 1, 2, 3
     type = 'collage',               # grid, collage 
-    tilt = 'rand',                  # none, uniform, grid, rand
+    tilt = 'none',                  # none, uniform, grid, rand
     bgType = 'solid',                 # grid, solid
     bgColor = (0,0,0),              # Black default, no transparency
     transparentTiltBg= True,           # Transparent Bg for tilt
@@ -79,6 +81,7 @@ class CollageMakerV2:
         return f'{folder}/{self.type}_scale{self.scale}_{date}.png'
     
     def expand2square(self, pil_img):
+        print(self.bg_color)
         width, height = pil_img.size
         if width == height:
             return pil_img
@@ -90,41 +93,9 @@ class CollageMakerV2:
             result = Image.new(pil_img.mode, (height, height), self.bg_color)
             result.paste(pil_img, ((height - width) // 2, 0))
             return result
-    
-    def setRandomImageCoords(self, row, col, sz):
-        offset = round(self.scaleDimensions() / 8)
-
-        # Set boundary
-        MAX_X = self.collage_width - round(.5*sz)
-        MAX_Y = self.collage_height - round(.5*sz)
-
-        # full random
-        fullrandom = (random.randint(0 - offset, MAX_X), random.randint(0 - offset, MAX_Y))
-
-        # pseudo random
-        min = round(-offset)
-        max = round(offset)
-
-        x = (row * sz) + random.randint(min, max)
-        y = (col * sz) + random.randint(min, max)
-        
-        # MAX CHECK MAX_X - offset
-        x = x if x < MAX_X else random.randint(0 - offset, MAX_X)
-        y = y if y < MAX_Y else random.randint(0 - offset, MAX_Y)
-
-        # #MIN CHECK
-        x = x if x > 0 - offset else random.randint(0, offset)
-        y = y if y > 0 - offset else random.randint(0, offset)
-
-        pseudo = (round(x),round(y))
-
-        return pseudo if self.random_type == 'semi' else fullrandom
 
     def setTilt(self, img):
         angle = 35
-        if img.size[0] != img.size[1]:
-            img = self.expand2square(img)
-
         if self.tilt == 'uniform': 
             angle = 45
             img = img.rotate(angle, fillcolor = self.bg_color, expand=True)
@@ -171,18 +142,26 @@ class CollageMakerV2:
         
         return collage
 
-    def layoutCollage(self, collage, coords, covers):
-        total = len(coords)
+    def layoutCollage(self, collage, covers):
 
-        while coords:
+        s = Sampler(self.collage_width, self.collage_height)
+        coords = s.sample(self.img_size/2, 30)
+        total = len(coords)
+        print("Coords: ", total)
+        print("Covers:", len(covers))
+
+        for i,c in enumerate(coords):
+            print(c)
+            x = np.int64(c[0]) - 300
+            y = np.int64(c[1]) - 200
+            point = (x,y)
+
             if len(covers) == 0:
                 print("Resetting Cover list")
                 covers = set(self.cover_list)
 
             img_url  = covers.pop()
-            row, col, = coords.pop()
-            diff = total - len(covers)
-            print(f"Printing Collage -> ({ math.trunc(((diff/total) * 100)) } %) | {diff} out of {total}")
+            print(f"Printing Collage -> ({ math.trunc(((i/total) * 100)) } %) | {i} out of {total}")
 
             # Load Image
             img = Image.open(requests.get(img_url, stream=True).raw)
@@ -194,24 +173,25 @@ class CollageMakerV2:
             img.thumbnail((sz, sz))
 
             # Tilt Image if enabled
+            if img.size[0] != img.size[1]:
+                img = self.expand2square(img)
+                sz = img.size[0]
             t = self.setTilt(img)
             img = t[0]
-
-            #Get coordinates
-
+                     
             if self.transparent_bg:
                 mask = Image.new("RGBA", (sz,sz), color='white')
-                mask = mask.rotate(t[1], expand = True)
+                mask = mask.rotate(t[1], expand = True).resize(img.size)
 
                 mask.save('mask.png')
                 img.save('img.png')
-                collage.paste(img, (location), mask)
+                collage.paste(img, (point), mask)
                 img.close()
                 mask.close()
                 continue
 
             # Add Image to document    
-            collage.paste(img, (location))
+            collage.paste(img, (point))
             img.close()
         
         # Save Collage and Return it?
@@ -225,33 +205,67 @@ class CollageMakerV2:
             collage =  self.layoutBaseGrid(collage, coords, covers)
         
         if self.type == 'collage':
-            collage = self.layoutCollage(collage, coords, covers)
+            collage = self.layoutCollage(collage, covers)
         
         # Save Collage and Return it?
         print(f"Save Location: {self.nameCollage()}")
         collage.save(self.nameCollage())
         return collage
 
-g = AlbumCoverGetter()
-#covers = g.getPlaylistTracks('3tFCJHUdyOH6wItKvVBBlJ')
-covers = g.getTopTracks()
+# Eya PL
+# covers = g.getPlaylistTracks('10REQKGQqq6WJFmgfsul9P')
 
-w = int(input("Enter Width: "))
-h = int(input("Enter Height: "))
-s = int(input('Enter Scale (1 is default): '))
+# covers = g.getTopTracks(tr='medium_term')
 
-c = CollageMaker(covers,
-    width= w,
-    height=h,
-    scale = s, 
+# w = int(input("Enter Width: "))
+# h = int(input("Enter Height: "))
+# s = int(input('Enter Scale (1 is default): '))
+
+# 3024 x 1984 pixels
+
+def run():
+
+    parser = argparse.ArgumentParser(description='Generate a wallpaper based on a playlist or your own listening history')
+    g = AlbumCoverGetter()
+
+    # Add arguments
+    parser.add_argument('-width', type=int, help='width of collage')
+    parser.add_argument('-height', type=int, help='height of collage')
+    parser.add_argument('-playlistID', type=str, help='Id of playlist to pass in')
+    parser.add_argument('-term', type=str, help='length of time to create data from')
+
+    # Parse arguments from command line
+    args = parser.parse_args()
+
+    if args.width is None:
+        print('Width or Height cannot be None')
+        sys.exit(1)
+
+    covers = []
+    if args.playlistID:
+        covers = g.getPlaylistTracks(args.playlistID)
+    if args.term:
+        covers = g.getTopTracks('medium_term')
+
+    # Access parsed arguments
+    w = args.width
+    h = args.height
+    term = args.term
+
+    maker = CollageMakerV2(covers,
+    width= 3000,
+    height= 2000,
+    scale = 1, 
     type = 'collage', 
-    bgColor = (255,255,255), # 4 value makes bg Transparent
+    bgColor = (0,0,0), # 4 value makes bg Transparent
     tilt='none', 
-    transparentTiltBg=False, # Meant for tilts
+    transparentTiltBg=True, # Meant for tilts
     varySize=True, 
     randomType='semi',
     bgType= 'solid'
     )
-c.createCollage()
+    maker.createCollage()
 
-# 3024 x 1984 pixels
+
+if __name__ == "__mainn__":    
+    run()

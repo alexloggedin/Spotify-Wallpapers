@@ -12,13 +12,13 @@ class AlbumCoverGetter:
                                 scope='user-top-read,playlist-read-private,user-read-private,user-read-email',
                                 client_id = SPOTIFY_CLIENT_ID,
                                 client_secret = SPOTIFY_CLIENT_SECRET,
-                                redirect_uri='http://localhost:5000'
+                                redirect_uri='http://localhost:8080'
                                 )
                                 
         self.sp = spotipy.Spotify(auth_manager=auth_manager)
         
     def getTopTracks(self, tr = 'short_term'):
-        data = self.sp.current_user_top_tracks(time_range=tr, limit='50')
+        data = self.sp.current_user_top_tracks(time_range=tr, limit=50, offset=2)
         c = []
         for item in data['items']:
             img_url = item['album']['images'][0]['url']
