@@ -2,7 +2,7 @@
 from flask import Flask, request, redirect, render_template, jsonify
 from Handlers.creds import SPOTIFY_CLIENT_SECRET, SPOTIFY_CLIENT_ID
 import spotipy
-from CollageMakerV2 import CollageMakerV2
+from CollageMaker.CollageMakerV2 import CollageMakerV2
 
 app = Flask(__name__)
 
